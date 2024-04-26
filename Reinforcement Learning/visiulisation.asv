@@ -1,0 +1,87 @@
+clc, clear all
+
+%% Load data
+Data = load('data.mat');
+dict = Data.dict;
+
+%% Parameters of the game
+M = 3;  % number of rows
+N = 3;  % number of columns
+Num = M * N;
+ACTIONS = ['u', 'd', 'l', 'r'];  % u, d, l, r
+State_num = factorial(Num) / 2;
+Q = zeros(State_num, length(ACTIONS));  % Q-table
+done = false;
+
+%% Initialization
+%[state] = Reset(M,Num);
+%% Deep Q-Network (DQN)
+EPSILON = 0.05;  % ε
+gamma = 0.9;  % discount factor
+ALPHA = 0.2;  % learning rate
+MAX_ITER = 100;  % Maximum iteration
+mode = 2;
+for iter = 1:MAX_ITER
+    disp(['Training iteration: ', num2str(iter)]);
+    [s, bk, done] = Reset(M, Num, mode);  % Initialize the state
+    while ~done
+        % Epsilon-greedy strategy for action selection
+        if rand > EPSILON
+            s_ind = all(dict(:, 1:Num) == s, 2);
+            [~, a] = max(Q(s_ind, :));
+        else
+            a = randi(length(ACTIONS));
+        end
+        action = ACTIONS(a);
+
+        % Take action, obtain new state and reward
+        [s_new, bk_new, reward, done] = take_action(s, bk, a, M, Num, dict, done);
+
+        % Update Q-table using Bellman equation
+        s_ind = find(all(dict(:, 1:Num) == s, 2));
+        s_new_ind = find(all(dict(:, 1:Num) == s_new, 2));
+        target = reward + gamma * max(Q(s_new_ind, :)) * (1 - done);
+        Q(s_ind, a) = Q(s_ind, a) + ALPHA * (target - Q(s_ind, a));
+
+        s = s_new;
+        bk = bk_new;
+   % Visualization
+   avg_rewards = mean(reward, 2);
+   figure;
+   plot(reward);
+   title('Q-learning Training Rewards');
+   xlabel('Episode');
+   ylabel('Total Reward');
+    end
+end
+
+% Execute optimal strategy
+[s, bk, done] = Reset(M, Num, mode);  % Initialization
+goal = [1:Num - 1, 0];
+step = 0;
+test_step = 300;
+state_history = zeros(test_step, Num);
+while step < test_step
+    step = step + 1;
+    s_ind = find(all(dict(:, 1:Num) == s, 2));
+    [~, a] = max(Q(s_ind, :));
+    action = ACTIONS(a);
+    state_history(step, :) = s;
+    disp(['Current state: ', num2str(s), ', take action: ', action]);
+    [s_new, bk_new, reward, done] = take_action(s, bk, a, M, Num, dict, done);
+    s = s_new;
+    bk = bk_new;
+    if isequal(s, goal)
+        state_history(step + 1:end, :) = repmat(goal, test_step - step, 1);
+        disp(['Current state: ', num2str(s)]);
+        disp(['Completed successfully! Total steps: ', num2str(step)]);
+        break;
+    end
+end
+
+% Visualization
+figure;
+plot(reward);
+title('Q-learning Training Rewards');
+xlabel('Episode');
+ylabel('Total Reward');
